@@ -1,86 +1,59 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 // Real-Life Patch Notes: The Comedy Changelog (make.fun).
-// One original patch note, at most 160 characters, for a bug in
-// real life or human biology, in the terse register of a release
-// note. This program writes the note to /output/entry.txt.
+// One patch note, at most 160 characters, for a bug in real life
+// or human biology, written in the terse register of a shipped
+// release note. This program writes the note to /output/entry.txt.
 //
-// The bug: a sneeze that builds up for ten seconds, then
-// cancels itself at the last frame. The body runs the whole
-// wind-up — the inhale, the squint, the held breath — and then
-// aborts the job with no error message. Everyone has lived it;
-// nobody has ever gotten the sneeze back.
-const PATCH =
-  "v3.0.2: fixed a bug where a sneeze built up for ten seconds, then cancelled itself at the last frame.";
+// The bug is the brain's stale name cache. It keeps calling the
+// new manager by the old manager's name, in every meeting, for
+// six weeks straight — and the old manager left in March. Three
+// beats in one line: the wrong name, the public repetition, and
+// the person who is not even there any more.
+// v2 rebuild: the v1 sneeze line placed #1,479 in round 1, so this
+// entry replaces it with a bug every office worker has shipped.
+const NOTE =
+  "v1.5.2: fixed a bug where the brain called the new manager by the old manager's name in every meeting for 6 weeks straight. The old manager left in March.";
 
-// Gate from the bounty rules: /output/entry.txt must be UTF-8
-// text of 1 to 160 characters, not only white space.
-const GATE = { minChars: 1, maxChars: 160 } as const;
+const OUT_PATH = "/output/entry.txt";
+const CHAR_LIMIT = 160;
 
-function countCodePoints(text: string): number {
-  return [...text].length;
-}
-
-function containsControlChars(text: string): boolean {
-  // One clean line: no line breaks, no control characters at all.
-  return /[\u0000-\u001f\u007f]/.test(text);
-}
-
-function isReleaseNoteShape(text: string): boolean {
-  // Criterion 3 of the judge's brief: the line must read like an
-  // actual release note — a version number, then a fix stated as
-  // if it shipped. Enforce the shape in code so the entry can
-  // never drift out of the release-note register by accident.
-  return /^v\d+\.\d+\.\d+: fixed a bug where .+\.$/.test(text);
-}
-
-function validatePatch(text: string): void {
-  const chars = countCodePoints(text);
-  if (chars < GATE.minChars || chars > GATE.maxChars) {
-    throw new Error(
-      `patch note must be ${GATE.minChars}-${GATE.maxChars} characters, got ${chars}`,
-    );
+// The gate from the bounty rules: /output/entry.txt must hold
+// UTF-8 text of 1 to 160 characters, and must not be only
+// white space. The judge's brief adds the shape: a version
+// number, a terse engineering register, a fix stated as shipped.
+function checkNote(note: string): void {
+  const chars = [...note].length;
+  if (chars < 1 || chars > CHAR_LIMIT) {
+    throw new Error(`patch note must be 1-${CHAR_LIMIT} characters, got ${chars}`);
   }
-  if (text.trim().length === 0) {
+  if (note.trim().length === 0) {
     throw new Error("patch note must not be only white space");
   }
-  if (containsControlChars(text)) {
-    throw new Error("patch note must be a single line without control characters");
+  const hasControlChar = [...note].some((ch) => {
+    const code = ch.codePointAt(0) as number;
+    return code < 32 || code === 127;
+  });
+  if (hasControlChar) {
+    throw new Error("patch note must be one clean line, no control characters");
   }
-  if (!isReleaseNoteShape(text)) {
-    throw new Error(
-      "patch note must read like a release note: vX.Y.Z: fixed a bug where ...",
-    );
+  const releaseNoteShape = /^v[0-9]+\.[0-9]+\.[0-9]+: fixed a bug where .+\.$/;
+  if (!releaseNoteShape.test(note)) {
+    throw new Error("patch note must read like a release note: vX.Y.Z: fixed a bug where ... .");
   }
 }
 
-function emitPatch(): void {
-  validatePatch(PATCH);
+function main(): void {
+  checkNote(NOTE);
   mkdirSync("/output", { recursive: true });
-  writeFileSync("/output/entry.txt", PATCH, "utf8");
-}
-
-function confirmPatch(): void {
-  // Read back and confirm the file holds exactly the patch note.
-  const back = readFileSync("/output/entry.txt", "utf8");
-  if (back !== PATCH) {
-    throw new Error("read-back mismatch: entry.txt differs from PATCH");
+  writeFileSync(OUT_PATH, NOTE, "utf8");
+  const back = readFileSync(OUT_PATH, "utf8");
+  if (back !== NOTE) {
+    throw new Error("read-back mismatch: entry.txt does not hold NOTE");
   }
-  console.log(
-    `wrote /output/entry.txt (${countCodePoints(PATCH)} chars, ${Buffer.byteLength(PATCH, "utf8")} bytes)`,
-  );
+  const chars = [...NOTE].length;
+  const bytes = Buffer.byteLength(NOTE, "utf8");
+  console.log(`entry.txt written: ${chars} characters, ${bytes} bytes, no trailing newline`);
 }
 
-emitPatch();
-confirmPatch();
-
-// Sanity: the output directory must already exist for the read-back
-// above, so report its presence as a final cheap assertion.
-if (!existsSync("/output/entry.txt")) {
-  throw new Error("entry.txt missing after write");
-}
+main();
